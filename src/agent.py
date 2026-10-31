@@ -7,6 +7,7 @@ from google.genai import types
 from google.genai.errors import ClientError, ServerError
 
 from src.repositories.product_repository import ProductRepository
+from src.repositories.order_repository import OrderRepository
 
 
 load_dotenv()
@@ -14,20 +15,29 @@ load_dotenv()
 
 class TeoAgent:
 
-    def __init__(self, client=None, product_repository=None):
+    def __init__(
+        self,
+        client=None,
+        product_repository=None,
+        order_repository=None
+    ):
         self.client = client if client is not None else genai.Client(
             api_key=os.getenv("GEMINI_API_KEY"),
-            http_options=types.HttpOptions(
-                timeout=30000
-            )
+            http_options=types.HttpOptions(timeout=30000)
         )
 
-        self.model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+        self.model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
         self.products = (
             product_repository
             if product_repository is not None
             else ProductRepository()
+        )
+
+        self.orders = (
+            order_repository
+            if order_repository is not None
+            else OrderRepository()
         )
 
         self.instructions = """
@@ -41,43 +51,87 @@ class TeoAgent:
         Use search_products whenever customers ask about products,
         prices, availability or product recommendations.
 
-        Use the category parameter for product types, such as
-        Violões, Guitarras, Teclados and Ukuleles.
-
+        Use the category parameter for product types.
         Use the name parameter for brands or specific models.
 
         Never invent products, prices or stock availability.
         Only use information returned by the store catalog.
 
         Respect the customer's budget and preferences.
-        If no matching products are found, say so clearly.
 
-        After receiving catalog results, answer the customer
-        directly instead of searching again for the same request.
+        Use get_order when a customer wants to check an order.
 
-        You cannot access orders, promotions or store policies yet.
+        When a customer wants to check an order, collect the
+        required information one question at a time.
+
+        First, ask for the order number.
+        After the customer provides the order number, ask for
+        the email address used for the purchase.
+
+        Never ask for both details in the same question.
+
+        Do not call get_order until both details are available.
+
+        Remember the order number and email provided during
+        the conversation.
+
+        Never reveal order details without a matching order
+        number and customer email.
+
+        If the order is not found, explain that the provided
+        information did not match an order.
+
+        Never invent order statuses, delivery dates or
+        tracking codes.
+
+        Do not ask for passwords, payment card details or
+        other unnecessary personal information.
+
+        After receiving a tool result, answer directly
+        using the returned information.
+
+        You cannot access promotions or store policies yet.
         Do not invent that information.
         """
 
         search_products_tool = types.FunctionDeclaration(
             name="search_products",
-            description="Search the store catalog. Use category for product types and name for brands or specific models.",
+            description="Search products in the store catalog.",
             parameters={
                 "type": "OBJECT",
                 "properties": {
                     "name": {
                         "type": "STRING",
-                        "description": "Brand or specific product model"
+                        "description": "Product brand or model"
                     },
                     "category": {
                         "type": "STRING",
-                        "description": "Product category, such as Violões, Guitarras, Teclados or Ukuleles"
+                        "description": "Product category"
                     },
                     "max_price": {
                         "type": "NUMBER",
-                        "description": "Maximum product price in Brazilian reais"
+                        "description": "Maximum price in Brazilian reais"
                     }
                 }
+            }
+        )
+
+        get_order_tool = types.FunctionDeclaration(
+            name="get_order",
+            description="Retrieve an order using its number and the customer's email.",
+            parameters={
+                "type": "OBJECT",
+                "properties": {
+                    "order_id": {
+                        "type": "INTEGER",
+                        "description": "Order number"
+                    },
+                    "customer_email": {
+                        "type": "STRING",
+                        "description": "Email address used for the order"
+                    }
+                },
+                "required": ["order_id", "customer_email"]
             }
         )
 
@@ -87,7 +141,10 @@ class TeoAgent:
                 system_instruction=self.instructions,
                 tools=[
                     types.Tool(
-                        function_declarations=[search_products_tool]
+                        function_declarations=[
+                            search_products_tool,
+                            get_order_tool
+                        ]
                     )
                 ],
                 automatic_function_calling=types.AutomaticFunctionCallingConfig(
@@ -110,9 +167,9 @@ class TeoAgent:
             results = []
 
             for call in calls:
-                if call.name == "search_products":
-                    args = dict(call.args or {})
+                args = dict(call.args or {})
 
+                if call.name == "search_products":
                     allowed_args = {
                         key: value
                         for key, value in args.items()
@@ -124,6 +181,29 @@ class TeoAgent:
                     )
 
                     result = {"products": products}
+
+                elif call.name == "get_order":
+                    order_id = args.get("order_id")
+                    customer_email = args.get("customer_email")
+
+                    if (
+                        isinstance(order_id, int)
+                        and not isinstance(order_id, bool)
+                        and order_id > 0
+                        and isinstance(customer_email, str)
+                        and customer_email.strip()
+                    ):
+                        order = self.orders.get_order(
+                            order_id=order_id,
+                            customer_email=customer_email
+                        )
+
+                        result = {"order": order}
+                    else:
+                        result = {
+                            "error": "Número do pedido ou e-mail inválido"
+                        }
+
                 else:
                     result = {"error": "Função não disponível"}
 
@@ -137,9 +217,9 @@ class TeoAgent:
             response = self.session.send_message(results)
 
             if response.function_calls:
-                return "Encontrei os dados do catálogo, mas não consegui concluir a resposta. Pode reformular sua pergunta?"
+                return "Não consegui concluir a consulta. Pode reformular sua pergunta?"
 
-            return response.text or "Não consegui apresentar os produtos encontrados."
+            return response.text or "Não consegui apresentar as informações encontradas."
 
         except ServerError as error:
             if error.code in (503, 504):
