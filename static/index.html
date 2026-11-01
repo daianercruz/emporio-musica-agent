@@ -1,0 +1,85 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#111114">
+    <title>Téo | Empório da Música</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎸</text></svg>">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+    <script src="/static/app.js" defer></script>
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <div class="brand">
+                <div class="brand-icon">♫</div>
+                <div class="brand-info">
+                    <h1>Téo</h1>
+                    <p>Empório da Música</p>
+                </div>
+            </div>
+
+            <button id="new-chat" class="new-chat" type="button">
+                + Nova conversa
+            </button>
+        </header>
+
+        <main id="chat" class="chat" aria-live="polite">
+            <section id="welcome" class="welcome">
+                <div class="welcome-icon">♫</div>
+
+                <h2>Olá! Eu sou o Téo.</h2>
+
+                <p>
+                    Seu assistente virtual da Empório da Música.
+                    Como posso ajudar você hoje?
+                </p>
+
+                <div class="suggestions">
+                    <button type="button" class="suggestion">
+                        Quais produtos estão em promoção?
+                    </button>
+
+                    <button type="button" class="suggestion">
+                        Vocês têm violões disponíveis?
+                    </button>
+
+                    <button type="button" class="suggestion">
+                        Como funciona a devolução?
+                    </button>
+
+                    <button type="button" class="suggestion">
+                        Quero consultar meu pedido.
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <footer class="composer">
+            <form id="chat-form">
+                <label for="message" class="sr-only">
+                    Sua mensagem
+                </label>
+
+                <textarea
+                    id="message"
+                    placeholder="Pergunte alguma coisa ao Téo..."
+                    rows="1"
+                    maxlength="2000"
+                    required
+                ></textarea>
+
+                <button id="send" type="submit" aria-label="Enviar mensagem">
+                    ➤
+                </button>
+            </form>
+
+            <p>O Téo utiliza inteligência artificial e pode cometer erros.</p>
+        </footer>
+    </div>
+</body>
+</html>
