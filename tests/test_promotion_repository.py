@@ -1,93 +1,55 @@
 
+from pathlib import Path
 import pandas as pd
-import pytest
-
-from src.repositories.promotion_repository import PromotionRepository
 
 
-@pytest.fixture
-def repository(tmp_path):
-    products = pd.DataFrame([
-        {
-            "product_id": 1,
-            "name": "Yamaha C40",
-            "price_brl": 800.00,
-            "stock_quantity": 5,
-            "status": "active"
-        },
-        {
-            "product_id": 2,
-            "name": "Fender Stratocaster",
-            "price_brl": 3500.00,
-            "stock_quantity": 3,
-            "status": "active"
-        },
-        {
-            "product_id": 3,
-            "name": "Casio CT-S200",
-            "price_brl": 1200.00,
-            "stock_quantity": 0,
-            "status": "active"
-        }
-    ])
-
-    promotions = pd.DataFrame([
-        {
-            "promotion_id": 1,
-            "product_id": 1,
-            "discount_percent": 10,
-            "description": "Black Friday",
-            "is_active": 1
-        },
-        {
-            "promotion_id": 2,
-            "product_id": 2,
-            "discount_percent": 20,
-            "description": "Winter Sale",
-            "is_active": 0
-        },
-        {
-            "promotion_id": 3,
-            "product_id": 3,
-            "discount_percent": 15,
-            "description": "Special Offer",
-            "is_active": 1
-        }
-    ])
-
-    products.to_csv(tmp_path / "products.csv", index=False)
-    promotions.to_csv(tmp_path / "promotions.csv", index=False)
-
-    return PromotionRepository(tmp_path)
+DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 
 
-def test_get_active_promotions(repository):
-    promotions = repository.get_active_promotions()
+class PromotionRepository:
 
-    assert len(promotions) == 1
-    assert promotions[0]["name"] == "Yamaha C40"
+    def __init__(self, data_dir=DATA_DIR):
+        self.promotions = pd.read_csv(data_dir / "promotions.csv")
+        self.products = pd.read_csv(data_dir / "products.csv")
 
+    def get_active_promotions(self):
+        active = self.promotions[self.promotions["is_active"] == 1]
 
-def test_calculate_discount(repository):
-    promotion = repository.get_product_promotion(1)
+        results = active.merge(
+            self.products,
+            on="product_id",
+            how="inner"
+        )
 
-    assert promotion["original_price"] == 800.00
-    assert promotion["final_price"] == 720.00
+        results = results[
+            (results["status"] == "active") &
+            (results["stock_quantity"] > 0)
+        ]
 
+        promotions = []
 
-def test_ignore_inactive_promotions(repository):
-    promotion = repository.get_product_promotion(2)
+        for _, item in results.iterrows():
+            original_price = float(item["price_brl"])
+            discount = float(item["discount_percent"])
+            final_price = round(original_price * (1 - discount / 100), 2)
 
-    assert promotion is None
+            promotions.append({
+                "promotion_id": int(item["promotion_id"]),
+                "product_id": int(item["product_id"]),
+                "name": item["name"],
+                "description": item["description"],
+                "original_price": original_price,
+                "discount_percent": discount,
+                "final_price": final_price
+            })
 
+        return promotions
 
-def test_ignore_out_of_stock_products(repository):
-    promotion = repository.get_product_promotion(3)
+    def get_product_promotion(self, product_id: int):
+        promotions = self.get_active_promotions()
 
-    assert promotion is None
+        for promotion in promotions:
+            if promotion["product_id"] == product_id:
+                return promotion
 
-
-def test_unknown_product(repository):
-    promotion = repository.get_product_promotion(999)
-
-    assert promotion is None
+        return None

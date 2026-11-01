@@ -16,7 +16,6 @@ load_dotenv()
 
 
 class TeoAgent:
-
     def __init__(
         self,
         client=None,
@@ -88,6 +87,12 @@ class TeoAgent:
         Never invent discounts, promotional prices or offers.
         Only present promotions returned by the tools.
 
+        When a request combines products, prices and promotions,
+        consult all relevant tools before answering.
+
+        Do not claim that a product has a promotion unless
+        it matches a promotion returned by the tools.
+
         Use get_order when a customer wants to check an order.
 
         When a customer wants to check an order, collect the
@@ -136,17 +141,44 @@ class TeoAgent:
         Distinguish online purchases from in-store purchases
         whenever the policy makes that distinction.
 
+        Do not assume the purchase channel if the customer
+        has not provided that information.
+
         Do not confuse return deadlines with exchange
         deadlines or warranty periods.
 
-        When useful, mention the page of the policy document
-        supporting your answer.
+        When answering questions about store policies,
+        respond naturally as a customer support assistant.
 
-        After receiving a tool result, answer directly
-        using the returned information.
+        Never mention page numbers, PDF files, document names
+        or internal sources to customers.
+
+        Present policy information directly, without phrases
+        such as "according to page 7".
+
+        After receiving tool results, determine whether
+        additional tool calls are needed to answer the question.
+
+        Use additional tools when necessary, but avoid
+        repeating the same consultation unnecessarily.
+
+        Never claim to have canceled, refunded or modified
+        an order because these actions are not available.
 
         If a request is outside the store's scope,
         politely explain what you can help with.
+        
+        When a customer asks about returning or exchanging a product
+        without specifying whether the purchase was made online
+        or in a physical store, ask which purchase channel was used
+        before explaining the applicable return policy.
+
+        Do not assume that the purchase was made online or in-store.
+
+        Ask only one clarification question at a time.
+
+        Once the customer confirms the purchase channel,
+        consult the store policies and explain the applicable rules.
         """
 
         search_products_tool = types.FunctionDeclaration(
@@ -173,7 +205,10 @@ class TeoAgent:
 
         get_order_tool = types.FunctionDeclaration(
             name="get_order",
-            description="Retrieve an order using its number and the customer's email.",
+            description=(
+                "Retrieve an order using its number "
+                "and the customer's email."
+            ),
             parameters={
                 "type": "OBJECT",
                 "properties": {
@@ -192,7 +227,9 @@ class TeoAgent:
 
         get_active_promotions_tool = types.FunctionDeclaration(
             name="get_active_promotions",
-            description="Retrieve active promotions for available products.",
+            description=(
+                "Retrieve active promotions for available products."
+            ),
             parameters={
                 "type": "OBJECT",
                 "properties": {}
@@ -201,7 +238,10 @@ class TeoAgent:
 
         get_product_promotion_tool = types.FunctionDeclaration(
             name="get_product_promotion",
-            description="Retrieve the active promotion for a specific product ID.",
+            description=(
+                "Retrieve the active promotion "
+                "for a specific product ID."
+            ),
             parameters={
                 "type": "OBJECT",
                 "properties": {
@@ -263,113 +303,139 @@ class TeoAgent:
 
         try:
             response = self.session.send_message(message)
-            calls = response.function_calls or []
+            max_tool_rounds = 5
 
-            if not calls:
-                return response.text or "Não consegui responder agora."
+            for _ in range(max_tool_rounds):
+                calls = response.function_calls or []
 
-            results = []
-
-            for call in calls:
-                args = dict(call.args or {})
-
-                if call.name == "search_products":
-                    allowed_args = {
-                        key: value
-                        for key, value in args.items()
-                        if key in {"name", "category", "max_price"}
-                    }
-
-                    products = self.products.search_products(
-                        **allowed_args
+                if not calls:
+                    return (
+                        response.text
+                        or "Não consegui apresentar as informações encontradas."
                     )
 
-                    result = {"products": products}
+                results = []
 
-                elif call.name == "get_order":
-                    order_id = args.get("order_id")
-                    customer_email = args.get("customer_email")
+                for call in calls:
+                    args = dict(call.args or {})
 
-                    if (
-                        isinstance(order_id, int)
-                        and not isinstance(order_id, bool)
-                        and order_id > 0
-                        and isinstance(customer_email, str)
-                        and customer_email.strip()
-                    ):
-                        order = self.orders.get_order(
-                            order_id=order_id,
-                            customer_email=customer_email
-                        )
-
-                        result = {"order": order}
-                    else:
-                        result = {
-                            "error": "Número do pedido ou e-mail inválido"
+                    if call.name == "search_products":
+                        allowed_args = {
+                            key: value
+                            for key, value in args.items()
+                            if key in {"name", "category", "max_price"}
                         }
 
-                elif call.name == "get_active_promotions":
-                    promotions = self.promotions.get_active_promotions()
-
-                    result = {"promotions": promotions}
-
-                elif call.name == "get_product_promotion":
-                    product_id = args.get("product_id")
-
-                    if (
-                        isinstance(product_id, int)
-                        and not isinstance(product_id, bool)
-                        and product_id > 0
-                    ):
-                        promotion = self.promotions.get_product_promotion(
-                            product_id=product_id
+                        products = self.products.search_products(
+                            **allowed_args
                         )
 
-                        result = {"promotion": promotion}
-                    else:
-                        result = {"error": "ID do produto inválido"}
+                        result = {"products": products}
 
-                elif call.name == "search_store_policies":
-                    question = args.get("question")
+                    elif call.name == "get_order":
+                        order_id = args.get("order_id")
+                        customer_email = args.get("customer_email")
 
-                    if (
-                        isinstance(question, str)
-                        and question.strip()
-                    ):
-                        policies = self.policies.search(
-                            question=question,
-                            limit=3
+                        if (
+                            isinstance(order_id, int)
+                            and not isinstance(order_id, bool)
+                            and order_id > 0
+                            and isinstance(customer_email, str)
+                            and customer_email.strip()
+                        ):
+                            order = self.orders.get_order(
+                                order_id=order_id,
+                                customer_email=customer_email
+                            )
+
+                            result = {"order": order}
+                        else:
+                            result = {
+                                "error": "Número do pedido ou e-mail inválido"
+                            }
+
+                    elif call.name == "get_active_promotions":
+                        promotions = (
+                            self.promotions.get_active_promotions()
                         )
 
-                        result = {"policies": policies}
+                        result = {"promotions": promotions}
+
+                    elif call.name == "get_product_promotion":
+                        product_id = args.get("product_id")
+
+                        if (
+                            isinstance(product_id, int)
+                            and not isinstance(product_id, bool)
+                            and product_id > 0
+                        ):
+                            promotion = (
+                                self.promotions.get_product_promotion(
+                                    product_id=product_id
+                                )
+                            )
+
+                            result = {"promotion": promotion}
+                        else:
+                            result = {
+                                "error": "ID do produto inválido"
+                            }
+
+                    elif call.name == "search_store_policies":
+                        question = args.get("question")
+
+                        if (
+                            isinstance(question, str)
+                            and question.strip()
+                        ):
+                            policies = self.policies.search(
+                                question=question,
+                                limit=3
+                            )
+
+                            result = {"policies": policies}
+                        else:
+                            result = {
+                                "error": "Pergunta de política inválida"
+                            }
+
                     else:
                         result = {
-                            "error": "Pergunta de política inválida"
+                            "error": "Função não disponível"
                         }
 
-                else:
-                    result = {"error": "Função não disponível"}
-
-                results.append(
-                    types.Part.from_function_response(
-                        name=call.name,
-                        response=result
+                    results.append(
+                        types.Part.from_function_response(
+                            name=call.name,
+                            response=result
+                        )
                     )
-                )
 
-            response = self.session.send_message(results)
+                response = self.session.send_message(results)
 
             if response.function_calls:
-                return "Não consegui concluir a consulta. Pode reformular sua pergunta?"
+                return (
+                    "Não consegui concluir todas as consultas "
+                    "necessárias. Pode tentar novamente?"
+                )
 
-            return response.text or "Não consegui apresentar as informações encontradas."
+            return (
+                response.text
+                or "Não consegui apresentar as informações encontradas."
+            )
 
         except ServerError as error:
             if error.code in (503, 504):
-                return "Estou com dificuldade para acessar o sistema agora. Pode tentar novamente em instantes?"
+                return (
+                    "Estou com dificuldade para acessar o sistema agora. "
+                    "Pode tentar novamente em instantes?"
+                )
             raise
 
         except ClientError as error:
             if error.code == 429:
-                return "O limite de consultas foi atingido. Pode tentar novamente mais tarde?"
+                return (
+                    "O limite de consultas foi atingido. "
+                    "Pode tentar novamente mais tarde?"
+                )
             raise
