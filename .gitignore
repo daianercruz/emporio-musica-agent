@@ -1,6 +1,9 @@
 .venv/
 .env
 __pycache__/
-*.pyc
+*.py[cod]
 .pytest_cache/
-sessions/
+.coverage
+htmlcov/
+.vscode/
+saida.txt
