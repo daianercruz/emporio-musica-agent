@@ -8,6 +8,7 @@ from google.genai.errors import ClientError, ServerError
 
 from src.repositories.product_repository import ProductRepository
 from src.repositories.order_repository import OrderRepository
+from src.repositories.promotion_repository import PromotionRepository
 
 
 load_dotenv()
@@ -19,7 +20,8 @@ class TeoAgent:
         self,
         client=None,
         product_repository=None,
-        order_repository=None
+        order_repository=None,
+        promotion_repository=None
     ):
         self.client = client if client is not None else genai.Client(
             api_key=os.getenv("GEMINI_API_KEY"),
@@ -38,6 +40,12 @@ class TeoAgent:
             order_repository
             if order_repository is not None
             else OrderRepository()
+        )
+
+        self.promotions = (
+            promotion_repository
+            if promotion_repository is not None
+            else PromotionRepository()
         )
 
         self.instructions = """
@@ -59,6 +67,19 @@ class TeoAgent:
 
         Respect the customer's budget and preferences.
 
+        Use get_active_promotions when customers ask about current
+        promotions, discounts or promotional offers.
+
+        Use get_product_promotion when a customer asks whether
+        a specific product has a promotion and its product ID
+        is already known from the catalog or conversation.
+
+        If the product ID is unknown, use search_products first.
+        Never guess product IDs.
+
+        Never invent discounts, promotional prices or offers.
+        Only present promotions returned by the tools.
+
         Use get_order when a customer wants to check an order.
 
         When a customer wants to check an order, collect the
@@ -75,6 +96,8 @@ class TeoAgent:
         Remember the order number and email provided during
         the conversation.
 
+        Never ask for both details in the same question.
+
         Never reveal order details without a matching order
         number and customer email.
 
@@ -90,8 +113,8 @@ class TeoAgent:
         After receiving a tool result, answer directly
         using the returned information.
 
-        You cannot access promotions or store policies yet.
-        Do not invent that information.
+        You cannot access store policies yet.
+        Do not invent policy information.
         """
 
         search_products_tool = types.FunctionDeclaration(
@@ -135,6 +158,30 @@ class TeoAgent:
             }
         )
 
+        get_active_promotions_tool = types.FunctionDeclaration(
+            name="get_active_promotions",
+            description="Retrieve active promotions for available products.",
+            parameters={
+                "type": "OBJECT",
+                "properties": {}
+            }
+        )
+
+        get_product_promotion_tool = types.FunctionDeclaration(
+            name="get_product_promotion",
+            description="Retrieve the active promotion for a specific product ID.",
+            parameters={
+                "type": "OBJECT",
+                "properties": {
+                    "product_id": {
+                        "type": "INTEGER",
+                        "description": "Product ID from the store catalog"
+                    }
+                },
+                "required": ["product_id"]
+            }
+        )
+
         self.session = self.client.chats.create(
             model=self.model,
             config=types.GenerateContentConfig(
@@ -143,7 +190,9 @@ class TeoAgent:
                     types.Tool(
                         function_declarations=[
                             search_products_tool,
-                            get_order_tool
+                            get_order_tool,
+                            get_active_promotions_tool,
+                            get_product_promotion_tool
                         ]
                     )
                 ],
@@ -203,6 +252,27 @@ class TeoAgent:
                         result = {
                             "error": "Número do pedido ou e-mail inválido"
                         }
+
+                elif call.name == "get_active_promotions":
+                    promotions = self.promotions.get_active_promotions()
+
+                    result = {"promotions": promotions}
+
+                elif call.name == "get_product_promotion":
+                    product_id = args.get("product_id")
+
+                    if (
+                        isinstance(product_id, int)
+                        and not isinstance(product_id, bool)
+                        and product_id > 0
+                    ):
+                        promotion = self.promotions.get_product_promotion(
+                            product_id=product_id
+                        )
+
+                        result = {"promotion": promotion}
+                    else:
+                        result = {"error": "ID do produto inválido"}
 
                 else:
                     result = {"error": "Função não disponível"}

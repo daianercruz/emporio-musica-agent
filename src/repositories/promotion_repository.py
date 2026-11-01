@@ -13,12 +13,15 @@ class PromotionRepository:
         self.products = pd.read_csv(data_dir / "products.csv")
 
     def get_active_promotions(self):
-        active = self.promotions[self.promotions["is_active"] == 1]
+        active = self.promotions[
+            self.promotions["is_active"] == 1
+        ]
 
         results = active.merge(
             self.products,
             on="product_id",
-            how="inner"
+            how="inner",
+            suffixes=("_promotion", "_product")
         )
 
         results = results[
@@ -31,13 +34,16 @@ class PromotionRepository:
         for _, item in results.iterrows():
             original_price = float(item["price_brl"])
             discount = float(item["discount_percent"])
-            final_price = round(original_price * (1 - discount / 100), 2)
+            final_price = round(
+                original_price * (1 - discount / 100),
+                2
+            )
 
             promotions.append({
                 "promotion_id": int(item["promotion_id"]),
                 "product_id": int(item["product_id"]),
                 "name": item["name"],
-                "description": item["description"],
+                "description": item["description_promotion"],
                 "original_price": original_price,
                 "discount_percent": discount,
                 "final_price": final_price

@@ -61,9 +61,47 @@ class FakeProductRepository:
         return self.products
 
 
+class FakePromotionRepository:
+
+    def __init__(self, promotions=None):
+        self.promotions = promotions if promotions is not None else [
+            {
+                "promotion_id": 10,
+                "product_id": 1,
+                "name": "Yamaha C40",
+                "description": "Desconto especial",
+                "original_price": 599.90,
+                "discount_percent": 10,
+                "final_price": 539.91
+            }
+        ]
+        self.active_calls = 0
+        self.product_searches = []
+
+    def get_active_promotions(self):
+        self.active_calls += 1
+        return self.promotions
+
+    def get_product_promotion(self, product_id):
+        self.product_searches.append(product_id)
+
+        for promotion in self.promotions:
+            if promotion["product_id"] == product_id:
+                return promotion
+
+        return None
+
+
 def make_product_call(**kwargs):
     return types.FunctionCall(
         name="search_products",
+        args=kwargs
+    )
+
+
+def make_promotion_call(name, **kwargs):
+    return types.FunctionCall(
+        name=name,
         args=kwargs
     )
 
@@ -223,3 +261,197 @@ def test_agent_sends_catalog_results_to_gemini():
     assert function_response.response == {
         "products": repository.products
     }
+
+
+def test_agent_gets_active_promotions():
+    client = FakeClient([
+        FakeResponse(
+            function_calls=[
+                make_promotion_call("get_active_promotions")
+            ]
+        ),
+        FakeResponse(text="Temos o Yamaha C40 com 10% de desconto.")
+    ])
+
+    repository = FakePromotionRepository()
+
+    agent = TeoAgent(
+        client=client,
+        promotion_repository=repository
+    )
+
+    answer = agent.chat("Quais produtos estão em promoção?")
+
+    assert repository.active_calls == 1
+    assert answer == "Temos o Yamaha C40 com 10% de desconto."
+
+    tool_message = client.chats.session.messages[1]
+    function_response = tool_message[0].function_response
+
+    assert function_response.name == "get_active_promotions"
+    assert function_response.response == {
+        "promotions": repository.promotions
+    }
+
+
+def test_agent_returns_empty_promotions():
+    client = FakeClient([
+        FakeResponse(
+            function_calls=[
+                make_promotion_call("get_active_promotions")
+            ]
+        ),
+        FakeResponse(text="Não temos promoções disponíveis no momento.")
+    ])
+
+    repository = FakePromotionRepository(promotions=[])
+
+    agent = TeoAgent(
+        client=client,
+        promotion_repository=repository
+    )
+
+    answer = agent.chat("Tem alguma promoção?")
+
+    assert answer == "Não temos promoções disponíveis no momento."
+    assert repository.active_calls == 1
+
+    tool_message = client.chats.session.messages[1]
+
+    assert tool_message[0].function_response.response == {
+        "promotions": []
+    }
+
+
+def test_agent_gets_product_promotion():
+    client = FakeClient([
+        FakeResponse(
+            function_calls=[
+                make_promotion_call(
+                    "get_product_promotion",
+                    product_id=1
+                )
+            ]
+        ),
+        FakeResponse(text="O Yamaha C40 está com 10% de desconto.")
+    ])
+
+    repository = FakePromotionRepository()
+
+    agent = TeoAgent(
+        client=client,
+        promotion_repository=repository
+    )
+
+    answer = agent.chat("O Yamaha C40 está em promoção?")
+
+    assert repository.product_searches == [1]
+    assert answer == "O Yamaha C40 está com 10% de desconto."
+
+    tool_message = client.chats.session.messages[1]
+
+    assert tool_message[0].function_response.response == {
+        "promotion": repository.promotions[0]
+    }
+
+
+def test_agent_returns_no_product_promotion():
+    client = FakeClient([
+        FakeResponse(
+            function_calls=[
+                make_promotion_call(
+                    "get_product_promotion",
+                    product_id=999
+                )
+            ]
+        ),
+        FakeResponse(text="Esse produto não está em promoção.")
+    ])
+
+    repository = FakePromotionRepository()
+
+    agent = TeoAgent(
+        client=client,
+        promotion_repository=repository
+    )
+
+    answer = agent.chat("O produto 999 está em promoção?")
+
+    assert repository.product_searches == [999]
+    assert answer == "Esse produto não está em promoção."
+
+    tool_message = client.chats.session.messages[1]
+
+    assert tool_message[0].function_response.response == {
+        "promotion": None
+    }
+
+
+def test_agent_rejects_invalid_promotion_product_id():
+    client = FakeClient([
+        FakeResponse(
+            function_calls=[
+                make_promotion_call(
+                    "get_product_promotion",
+                    product_id=-1
+                )
+            ]
+        ),
+        FakeResponse(text="Não consegui consultar esse produto.")
+    ])
+
+    repository = FakePromotionRepository()
+
+    agent = TeoAgent(
+        client=client,
+        promotion_repository=repository
+    )
+
+    agent.chat("Consulte a promoção do produto -1.")
+
+    assert repository.product_searches == []
+
+    tool_message = client.chats.session.messages[1]
+
+    assert tool_message[0].function_response.response == {
+        "error": "ID do produto inválido"
+    }
+
+
+def test_agent_handles_multiple_promotion_calls():
+    client = FakeClient([
+        FakeResponse(
+            function_calls=[
+                make_promotion_call("get_active_promotions"),
+                make_promotion_call(
+                    "get_product_promotion",
+                    product_id=1
+                )
+            ]
+        ),
+        FakeResponse(text="O Yamaha C40 está em promoção.")
+    ])
+
+    repository = FakePromotionRepository()
+
+    agent = TeoAgent(
+        client=client,
+        promotion_repository=repository
+    )
+
+    answer = agent.chat("Quais promoções existem para o Yamaha C40?")
+
+    assert repository.active_calls == 1
+    assert repository.product_searches == [1]
+    assert answer == "O Yamaha C40 está em promoção."
+
+    tool_message = client.chats.session.messages[1]
+
+    assert len(tool_message) == 2
+    assert [
+        part.function_response.name
+        for part in tool_message
+    ] == [
+        "get_active_promotions",
+        "get_product_promotion"
+    ]
