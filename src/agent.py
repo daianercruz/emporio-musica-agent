@@ -9,6 +9,7 @@ from google.genai.errors import ClientError, ServerError
 from src.repositories.product_repository import ProductRepository
 from src.repositories.order_repository import OrderRepository
 from src.repositories.promotion_repository import PromotionRepository
+from src.repositories.policy_repository import PolicyRepository
 
 
 load_dotenv()
@@ -21,7 +22,8 @@ class TeoAgent:
         client=None,
         product_repository=None,
         order_repository=None,
-        promotion_repository=None
+        promotion_repository=None,
+        policy_repository=None
     ):
         self.client = client if client is not None else genai.Client(
             api_key=os.getenv("GEMINI_API_KEY"),
@@ -46,6 +48,12 @@ class TeoAgent:
             promotion_repository
             if promotion_repository is not None
             else PromotionRepository()
+        )
+
+        self.policies = (
+            policy_repository
+            if policy_repository is not None
+            else PolicyRepository()
         )
 
         self.instructions = """
@@ -96,8 +104,6 @@ class TeoAgent:
         Remember the order number and email provided during
         the conversation.
 
-        Never ask for both details in the same question.
-
         Never reveal order details without a matching order
         number and customer email.
 
@@ -110,11 +116,37 @@ class TeoAgent:
         Do not ask for passwords, payment card details or
         other unnecessary personal information.
 
+        Use search_store_policies whenever customers ask about
+        store rules, returns, exchanges, refunds, warranties,
+        shipping, deliveries, payment methods or opening hours.
+
+        Always consult the store policy repository before
+        answering questions about store policies.
+
+        Answer policy questions exclusively using information
+        returned by search_store_policies.
+
+        Do not invent policy rules, deadlines, exceptions,
+        payment conditions or store opening hours.
+
+        If the retrieved passages do not contain enough
+        information to answer, clearly explain that you
+        could not confirm the policy.
+
+        Distinguish online purchases from in-store purchases
+        whenever the policy makes that distinction.
+
+        Do not confuse return deadlines with exchange
+        deadlines or warranty periods.
+
+        When useful, mention the page of the policy document
+        supporting your answer.
+
         After receiving a tool result, answer directly
         using the returned information.
 
-        You cannot access store policies yet.
-        Do not invent policy information.
+        If a request is outside the store's scope,
+        politely explain what you can help with.
         """
 
         search_products_tool = types.FunctionDeclaration(
@@ -182,6 +214,28 @@ class TeoAgent:
             }
         )
 
+        search_store_policies_tool = types.FunctionDeclaration(
+            name="search_store_policies",
+            description=(
+                "Search the official store policy PDF for information "
+                "about returns, exchanges, refunds, warranties, "
+                "shipping, deliveries, payments and opening hours."
+            ),
+            parameters={
+                "type": "OBJECT",
+                "properties": {
+                    "question": {
+                        "type": "STRING",
+                        "description": (
+                            "Customer question or search terms "
+                            "related to store policies"
+                        )
+                    }
+                },
+                "required": ["question"]
+            }
+        )
+
         self.session = self.client.chats.create(
             model=self.model,
             config=types.GenerateContentConfig(
@@ -192,7 +246,8 @@ class TeoAgent:
                             search_products_tool,
                             get_order_tool,
                             get_active_promotions_tool,
-                            get_product_promotion_tool
+                            get_product_promotion_tool,
+                            search_store_policies_tool
                         ]
                     )
                 ],
@@ -273,6 +328,24 @@ class TeoAgent:
                         result = {"promotion": promotion}
                     else:
                         result = {"error": "ID do produto inválido"}
+
+                elif call.name == "search_store_policies":
+                    question = args.get("question")
+
+                    if (
+                        isinstance(question, str)
+                        and question.strip()
+                    ):
+                        policies = self.policies.search(
+                            question=question,
+                            limit=3
+                        )
+
+                        result = {"policies": policies}
+                    else:
+                        result = {
+                            "error": "Pergunta de política inválida"
+                        }
 
                 else:
                     result = {"error": "Função não disponível"}

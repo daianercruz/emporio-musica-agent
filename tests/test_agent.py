@@ -92,6 +92,26 @@ class FakePromotionRepository:
         return None
 
 
+class FakePolicyRepository:
+
+    def __init__(self, results=None):
+        self.results = results if results is not None else [
+            {
+                "page": 4,
+                "text": "O cliente pode solicitar a devolução em até 7 dias corridos após o recebimento do produto.",
+                "score": 2
+            }
+        ]
+        self.searches = []
+
+    def search(self, question, limit=3):
+        self.searches.append({
+            "question": question,
+            "limit": limit
+        })
+        return self.results
+
+
 def make_product_call(**kwargs):
     return types.FunctionCall(
         name="search_products",
@@ -102,6 +122,13 @@ def make_product_call(**kwargs):
 def make_promotion_call(name, **kwargs):
     return types.FunctionCall(
         name=name,
+        args=kwargs
+    )
+
+
+def make_policy_call(**kwargs):
+    return types.FunctionCall(
+        name="search_store_policies",
         args=kwargs
     )
 
@@ -454,4 +481,193 @@ def test_agent_handles_multiple_promotion_calls():
     ] == [
         "get_active_promotions",
         "get_product_promotion"
+    ]
+
+
+def test_agent_searches_store_policies():
+    client = FakeClient([
+        FakeResponse(
+            function_calls=[
+                make_policy_call(
+                    question="prazo para devolução online"
+                )
+            ]
+        ),
+        FakeResponse(text="O prazo é de 7 dias corridos.")
+    ])
+
+    repository = FakePolicyRepository()
+
+    agent = TeoAgent(
+        client=client,
+        policy_repository=repository
+    )
+
+    answer = agent.chat(
+        "Qual é o prazo para devolver uma compra online?"
+    )
+
+    assert answer == "O prazo é de 7 dias corridos."
+    assert repository.searches == [
+        {
+            "question": "prazo para devolução online",
+            "limit": 3
+        }
+    ]
+
+
+def test_agent_sends_policy_results_to_gemini():
+    client = FakeClient([
+        FakeResponse(
+            function_calls=[
+                make_policy_call(
+                    question="devolução"
+                )
+            ]
+        ),
+        FakeResponse(text="A devolução é permitida em até 7 dias.")
+    ])
+
+    repository = FakePolicyRepository()
+
+    agent = TeoAgent(
+        client=client,
+        policy_repository=repository
+    )
+
+    agent.chat("Posso devolver um produto?")
+
+    messages = client.chats.session.messages
+
+    assert len(messages) == 2
+    assert messages[0] == "Posso devolver um produto?"
+
+    tool_message = messages[1]
+
+    assert isinstance(tool_message, list)
+    assert len(tool_message) == 1
+    assert isinstance(tool_message[0], types.Part)
+
+    function_response = tool_message[0].function_response
+
+    assert function_response.name == "search_store_policies"
+    assert function_response.response == {
+        "policies": repository.results
+    }
+
+
+def test_agent_returns_empty_policy_results():
+    client = FakeClient([
+        FakeResponse(
+            function_calls=[
+                make_policy_call(
+                    question="estacionamento"
+                )
+            ]
+        ),
+        FakeResponse(
+            text="Não consegui confirmar essa informação."
+        )
+    ])
+
+    repository = FakePolicyRepository(results=[])
+
+    agent = TeoAgent(
+        client=client,
+        policy_repository=repository
+    )
+
+    answer = agent.chat(
+        "A loja possui estacionamento?"
+    )
+
+    assert answer == "Não consegui confirmar essa informação."
+
+    tool_message = client.chats.session.messages[1]
+
+    assert tool_message[0].function_response.response == {
+        "policies": []
+    }
+
+
+def test_agent_rejects_invalid_policy_question():
+    client = FakeClient([
+        FakeResponse(
+            function_calls=[
+                make_policy_call(question="")
+            ]
+        ),
+        FakeResponse(text="Não consegui consultar essa política.")
+    ])
+
+    repository = FakePolicyRepository()
+
+    agent = TeoAgent(
+        client=client,
+        policy_repository=repository
+    )
+
+    agent.chat("Consulte as políticas.")
+
+    assert repository.searches == []
+
+    tool_message = client.chats.session.messages[1]
+
+    assert tool_message[0].function_response.response == {
+        "error": "Pergunta de política inválida"
+    }
+
+
+def test_agent_handles_multiple_policy_calls():
+    client = FakeClient([
+        FakeResponse(
+            function_calls=[
+                make_policy_call(
+                    question="prazo de devolução"
+                ),
+                make_policy_call(
+                    question="frete de devolução"
+                )
+            ]
+        ),
+        FakeResponse(
+            text="O prazo é de 7 dias e o frete é por conta da loja."
+        )
+    ])
+
+    repository = FakePolicyRepository()
+
+    agent = TeoAgent(
+        client=client,
+        policy_repository=repository
+    )
+
+    answer = agent.chat(
+        "Qual é o prazo e quem paga o frete da devolução?"
+    )
+
+    assert answer == (
+        "O prazo é de 7 dias e o frete é por conta da loja."
+    )
+
+    assert repository.searches == [
+        {
+            "question": "prazo de devolução",
+            "limit": 3
+        },
+        {
+            "question": "frete de devolução",
+            "limit": 3
+        }
+    ]
+
+    tool_message = client.chats.session.messages[1]
+
+    assert len(tool_message) == 2
+    assert [
+        part.function_response.name
+        for part in tool_message
+    ] == [
+        "search_store_policies",
+        "search_store_policies"
     ]

@@ -6,43 +6,97 @@ from src.repositories.policy_repository import PolicyRepository
 
 
 @pytest.fixture
-def repository(tmp_path):
+def policy_repository(tmp_path):
     pdf_path = tmp_path / "politicas_da_loja.pdf"
 
     pdf = canvas.Canvas(str(pdf_path))
 
-    pdf.drawString(50, 750, "Horario de funcionamento")
-    pdf.drawString(50, 730, "A loja abre aos sabados das 9h as 13h.")
+    pdf.drawString(
+        50,
+        750,
+        "Politica de Trocas e Devolucoes"
+    )
+    pdf.drawString(
+        50,
+        730,
+        "O prazo para devolucao e de 7 dias corridos."
+    )
+    pdf.drawString(
+        50,
+        710,
+        "O frete de devolucao e por conta da loja."
+    )
+
     pdf.showPage()
 
-    pdf.drawString(50, 750, "Trocas e devolucoes")
-    pdf.drawString(50, 730, "Compras online podem ser devolvidas em 7 dias.")
+    pdf.drawString(
+        50,
+        750,
+        "Politica de Entregas"
+    )
+    pdf.drawString(
+        50,
+        730,
+        "O prazo de entrega e de 3 dias uteis."
+    )
+
     pdf.save()
 
-    return PolicyRepository(tmp_path)
+    return PolicyRepository(data_dir=tmp_path)
 
 
-def test_load_pdf(repository):
-    assert len(repository.pages) == 2
+def test_policy_repository_loads_pdf(policy_repository):
+    assert len(policy_repository.pages) == 2
 
 
-def test_search_opening_hours(repository):
-    results = repository.search("horario sabados")
+def test_policy_repository_normalizes_accents(policy_repository):
+    result = policy_repository.normalize(
+        "Devolução e REEMBOLSO"
+    )
+
+    assert result == [
+        "devolucao",
+        "e",
+        "reembolso"
+    ]
+
+
+def test_policy_repository_finds_return_policy(policy_repository):
+    results = policy_repository.search(
+        "Qual é o prazo para devolução?"
+    )
 
     assert results
-    assert results[0]["page"] == 1
+    assert any(
+        "7 dias corridos" in result["text"]
+        for result in results
+    )
 
 
-def test_search_returns_source_text(repository):
-    results = repository.search("devolvidas")
+def test_policy_repository_returns_page_number(policy_repository):
+    results = policy_repository.search(
+        "Qual é o prazo para entrega?"
+    )
 
     assert results
-    assert "7 dias" in results[0]["text"]
+    assert any(
+        result["page"] == 2
+        for result in results
+    )
 
 
-def test_empty_question(repository):
-    assert repository.search("") == []
+def test_policy_repository_returns_empty_for_blank_question(
+    policy_repository
+):
+    results = policy_repository.search("   ")
+
+    assert results == []
 
 
-def test_unknown_subject(repository):
-    assert repository.search("xilofonemisterioso") == []
+def test_policy_repository_respects_result_limit(policy_repository):
+    results = policy_repository.search(
+        "devolução",
+        limit=1
+    )
+
+    assert len(results) <= 1

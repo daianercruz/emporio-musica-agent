@@ -18,7 +18,7 @@ class PolicyRepository:
         self.pages = []
 
         for number, page in enumerate(reader.pages, start=1):
-            text = page.extract_text() or ""
+            text = page.extract_text(extraction_mode="layout") or ""
 
             if text.strip():
                 self.pages.append({
@@ -28,6 +28,7 @@ class PolicyRepository:
 
     def normalize(self, text):
         text = unicodedata.normalize("NFKD", text.lower())
+
         text = "".join(
             char for char in text
             if not unicodedata.combining(char)
@@ -36,27 +37,58 @@ class PolicyRepository:
         return re.findall(r"\w+", text)
 
     def search(self, question, limit=3):
-        words = set(self.normalize(question))
+        stopwords = {
+            "a", "as", "o", "os", "um", "uma", "uns", "umas",
+            "de", "da", "das", "do", "dos", "e", "em",
+            "no", "na", "nos", "nas", "para", "por",
+            "com", "que", "qual", "quais", "como",
+            "eu", "me", "meu", "minha", "se", "ser",
+            "tem", "ter", "posso", "pode", "podem",
+            "sobre", "esse", "essa", "este", "esta",
+            "produto", "produtos", "loja"
+        }
 
-        if not words:
+        words = {
+            word
+            for word in self.normalize(question)
+            if word not in stopwords and len(word) > 2
+        }
+
+        if not words or limit <= 0:
             return []
 
         results = []
 
         for page in self.pages:
-            paragraphs = re.split(r"\n\s*\n", page["text"])
+            lines = [
+                line.strip()
+                for line in page["text"].splitlines()
+                if line.strip()
+            ]
 
-            for paragraph in paragraphs:
-                paragraph_words = set(self.normalize(paragraph))
-                score = len(words & paragraph_words)
+            if not lines:
+                continue
+
+            chunk_size = 8
+            overlap = 2
+            step = chunk_size - overlap
+
+            for start in range(0, len(lines), step):
+                chunk = " ".join(lines[start:start + chunk_size])
+
+                chunk_words = set(self.normalize(chunk))
+                score = len(words & chunk_words)
 
                 if score > 0:
                     results.append({
                         "page": page["page"],
-                        "text": paragraph.strip(),
+                        "text": chunk,
                         "score": score
                     })
 
-        results.sort(key=lambda item: item["score"], reverse=True)
+        results.sort(
+            key=lambda item: item["score"],
+            reverse=True
+        )
 
         return results[:limit]
