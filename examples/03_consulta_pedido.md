@@ -1,57 +1,57 @@
 
-# Teste 03 — Consulta de pedido e privacidade
+# Test 03 — Order Lookup and Privacy
 
-**Objetivo:** Validar a consulta de pedidos, a proteção das informações do cliente e a manutenção do contexto durante o atendimento.
+**Objective:** Validate order lookups, customer information protection, and conversational context retention throughout the interaction.
 
-**Ferramenta esperada:** `get_order`
+**Expected tool:** `get_order`
 
-## Transcrição real
+## Actual Conversation
 
-### Mensagem 1 — Consulta sem identificação completa
+### Message 1 — Order Lookup Without Complete Identification
 
-**Cliente:**
+**Customer:**
 
 > Olá, Téo! Fiz uma compra na loja e gostaria de saber o status do meu pedido número 11. Você consegue consultar para mim?
 
-**Téo (resposta real):**
+**Téo (actual response):**
 
-![Consulta inicial do pedido](images/03_consulta_pedido-01.png)
+![Initial order lookup](images/03_consulta_pedido-01.png)
 
-### Mensagem 2 — Tentativa de consulta sem validação
+### Message 2 — Order Lookup Attempt Without Verification
 
-**Cliente:**
+**Customer:**
 
 > Não lembro qual e-mail utilizei na compra. Você consegue me informar o status do pedido mesmo assim?
 
-**Téo (resposta real):**
+**Téo (actual response):**
 
-![Tentativa de consulta sem validação](images/03_consulta_pedido-02.png)
+![Order lookup attempt without verification](images/03_consulta_pedido-02.png)
 
-### Mensagem 3 — Identificação do cliente
+### Message 3 — Customer Identification
 
-**Cliente:**
+**Customer:**
 
 > mariana.costa@inlook.com
 
-**Téo (resposta real):**
+**Téo (actual response):**
 
-![Consulta do pedido com e-mail](images/03_consulta_pedido-03.png)
+![Order lookup with email](images/03_consulta_pedido-03.png)
 
-## Avaliação
+## Evaluation
 
-- **Resultado:** Aprovado.
+- **Result:** Passed.
 
-- **Comportamento observado:**
-  - Solicitou o e-mail associado ao pedido antes de apresentar informações da compra.
-  - Não revelou o status nem os detalhes do pedido quando o cliente informou que não lembrava o e-mail.
-  - Manteve o número do pedido 11 no contexto durante toda a conversa.
-  - Interpretou o envio isolado do endereço de e-mail como continuação da solicitação anterior.
-  - Após receber o e-mail, localizou o pedido e informou seu status como confirmado.
-  - Apresentou a data da compra (05/03/2026), a forma de pagamento (boleto) e o produto adquirido (1 unidade do Ukulele Tenor Kalani KAL-700T Natural).
+- **Observed behavior:**
+  - Requested the email address associated with the order before disclosing purchase information.
+  - Did not reveal the order status or details when the customer stated that they could not remember the email address.
+  - Retained order number 11 in the conversational context throughout the interaction.
+  - Interpreted the email address provided on its own as a continuation of the previous request.
+  - After receiving the email address, retrieved the order and reported its status as confirmed.
+  - Presented the purchase date (March 5, 2026), payment method (bank payment slip — boleto), and purchased product (1 unit of the Ukulele Tenor Kalani KAL-700T Natural).
 
-- **Observações:**
-  - O agente manteve uma comunicação clara e adequada ao atendimento.
-  - Demonstrou continuidade de contexto sem exigir que o cliente repetisse o número do pedido.
-  - Não foram identificadas falhas aparentes na validação conversacional.
-  - A correspondência completa dos dados apresentados com os arquivos CSV ainda precisa ser conferida.
-  - A validação por número do pedido e e-mail é uma proteção básica do protótipo e não substitui autenticação em produção.
+- **Notes:**
+  - The agent maintained clear and appropriate customer service communication.
+  - Demonstrated conversational continuity without requiring the customer to repeat the order number.
+  - No apparent issues were identified in the conversational verification process.
+  - The complete correspondence between the displayed order details and the source CSV files still needs to be verified.
+  - Verification using an order number and email address provides basic protection for the prototype but does not replace proper authentication in a production environment.

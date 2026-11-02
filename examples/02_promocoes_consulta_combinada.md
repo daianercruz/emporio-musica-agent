@@ -1,102 +1,106 @@
 
-# Teste 02 — Promoções e cálculo de descontos
+# Test 02 — Promotions and Combined Queries
 
-**Objetivo:** Validar a consulta de promoções ativas, a apresentação de preços e descontos e a manutenção do contexto durante o atendimento.
+**Objective:** Validate the agent's ability to retrieve active promotions, display prices and discounts, combine information from different sources, perform multiple queries, and maintain conversational context.
 
-**Ferramentas esperadas:** `get_active_promotions`, `get_product_promotion` e, se necessário, `search_products`.
+**Expected tools:** `get_active_promotions`, `get_product_promotion`, `search_products`, and `search_store_policies` when needed.
 
-## Transcrição real
+## Actual Conversations
 
-### Mensagem 1 — Consulta de promoções
+### Part 1 — Promotions and Discount Calculations
 
-**Cliente:**
+#### Message 1 — Active Promotions
+
+**Customer:**
 
 > Olá, Téo! Estou procurando um instrumento musical com desconto. Quais promoções estão disponíveis atualmente? Pode me mostrar os produtos, os preços originais e os valores promocionais?
 
-**Téo (resposta real):**
+**Téo (actual response):**
 
-![Consulta de promoções](images/02_promocoes-01.png)
+![Promotions lookup](images/02_promocoes-01.png)
 
-### Mensagem 2 — Comparação de descontos
+#### Message 2 — Discount Comparison
 
-**Cliente:**
+**Customer:**
 
 > Dessas promoções que você me mostrou, qual oferece o maior desconto percentual? Quanto eu economizaria comprando esse produto?
 
-**Téo (resposta real):**
+**Téo (actual response):**
 
-![Comparação de descontos](images/02_promocoes-02.png)
+![Discount comparison](images/02_promocoes-02.png)
 
-### Mensagem 3 — Verificação de produto e estoque
+#### Message 3 — Product and Stock Verification
 
-**Cliente:**
+**Customer:**
 
 > Gostei desse produto com o maior desconto. Ele está disponível em estoque? Pode confirmar o preço final que eu pagaria?
 
-**Téo (resposta real):**
+**Téo (actual response):**
 
-![Verificação de preço e estoque](images/02_promocoes-03.png)
+![Price and stock verification](images/02_promocoes-03.png)
 
-Validar a capacidade do agente de combinar informações de diferentes fontes, executar múltiplas consultas e manter o contexto durante o atendimento.
+### Part 2 — Combined Queries
 
-### Mensagem 4 — Catálogo e promoções
+#### Message 4 — Catalog and Promotions
 
-**Cliente:**
+**Customer:**
 
 > Oi, Téo! Estou procurando um instrumento musical para começar a aprender, com orçamento de até R$ 1.000. Quais opções vocês têm disponíveis? Alguma delas está em promoção?
 
-**Téo (resposta real):**
+**Téo (actual response):**
 
-![Consulta combinada de produtos e promoções](images/02_consulta_combinada-01.png)
+![Combined product and promotion query](images/02_consulta_combinada-01.png)
 
-### Mensagem 5 — Recomendação e política de devolução
+#### Message 5 — Recommendation and Return Policy
 
-**Cliente:**
+**Customer:**
 
 > Dessas opções, qual você recomendaria para um iniciante? E se eu comprar pela internet e não gostar do instrumento, posso devolver?
 
-**Téo (resposta real):**
+**Téo (actual response):**
 
-![Recomendação e política de devolução](images/02_consulta_combinada-02.png)
+![Recommendation and return policy](images/02_consulta_combinada-02.png)
 
-### Mensagem 6 — Disponibilidade e condições da compra
+#### Message 6 — Availability and Return Conditions
 
-**Cliente:**
+**Customer:**
 
 > Gostei da sua recomendação! Esse instrumento está disponível em estoque? E, se eu precisar devolver por arrependimento, quem paga o frete?
 
-**Téo (resposta real):**
+**Téo (actual response):**
 
-![Disponibilidade e condições de devolução](images/02_consulta_combinada-03.png)
+![Availability and return conditions](images/02_consulta_combinada-03.png)
 
+## Evaluation
 
-## Avaliação
+**Result:** Passed conversational evaluation.
 
-- **Resultado:** Aprovado na avaliação conversacional.
+### Observed Behavior — Promotions and Discounts
 
-- **Comportamento observado:**
-  - Apresentou opções de violões e ukuleles dentro do orçamento de R$ 1.000.
-  - Identificou uma promoção do Ukulele Kalani KAL-700T Tenor Natural, informando o preço original de R$ 359,00 e o preço promocional de R$ 323,10, com 10% de desconto.
-  - Recomendou os violões Tagima Memphis AC-39 e Rozini RC-104 para iniciantes, justificando a escolha pelas características das cordas de nylon.
-  - Explicou as condições de devolução para compras realizadas pela internet, incluindo o prazo de sete dias corridos para arrependimento.
-  - Manteve o contexto da conversa ao responder às perguntas posteriores sobre disponibilidade e frete.
-  - Informou a disponibilidade de 15 unidades do Tagima Memphis AC-39 e 10 unidades do Rozini RC-104.
-  - Esclareceu que o frete de devolução por arrependimento seria custeado pela loja.
-  - Diante da referência ambígua "esse instrumento", apresentou o estoque dos dois modelos recomendados anteriormente.
-  - Apresentou quatro produtos com promoções ativas, informando preços originais, preços promocionais e percentuais de desconto.
-  - Identificou corretamente o Ukulele Ohana CK-20 Concert Natural como o produto com o maior desconto percentual entre as opções apresentadas (20%).
-  - Calculou corretamente a economia de R$ 109,80 sobre o preço original de R$ 549,00.
-  - Manteve o contexto da conversa ao identificar o produto mencionado indiretamente na terceira pergunta.
-  - Informou a disponibilidade de 6 unidades do Ukulele Ohana CK-20 Concert Natural.
-  - Confirmou o preço promocional de R$ 439,20, mantendo a consistência com as respostas anteriores.
+- Presented four products with active promotions, including original prices, promotional prices, and discount percentages.
+- Correctly identified the Ukulele Ohana CK-20 Concert Natural as the product with the highest percentage discount among the displayed options (20%).
+- Correctly calculated savings of R$ 109.80 from the original price of R$ 549.00.
+- Maintained conversational context when identifying the product indirectly referenced in the third question.
+- Reported 6 units of the Ukulele Ohana CK-20 Concert Natural in stock.
+- Confirmed the promotional price of R$ 439.20, consistent with previous responses.
 
-- **Observações:**
-  - O agente demonstrou capacidade de combinar diferentes tipos de informação em um único atendimento.
-  - As respostas foram claras, contextualizadas e coerentes com as perguntas realizadas.
-  - O desconto de 10% apresentado para o ukulele está matematicamente correto.
-  - Não foram identificadas contradições aparentes entre as três respostas.
-  - A correspondência dos preços, estoques e regras de devolução com os arquivos CSV e o PDF ainda precisa ser verificada diretamente.
-  - O agente apresentou as promoções de maneira clara e organizada.
-  - Demonstrou capacidade de realizar cálculos de descontos e interpretar perguntas que dependiam do contexto anterior.
-  - Não foram identificados erros de cálculo ou inconsistências entre as três respostas.
-  - A correspondência das promoções e quantidades em estoque com os arquivos CSV ainda não foi verificada diretamente nesta avaliação.
+### Observed Behavior — Combined Queries
+
+- Presented acoustic guitar and ukulele options within the R$ 1,000 budget.
+- Identified an active promotion for the Ukulele Kalani KAL-700T Tenor Natural, showing the original price of R$ 359.00 and the promotional price of R$ 323.10, with a 10% discount.
+- Recommended the Tagima Memphis AC-39 and Rozini RC-104 acoustic guitars for beginners, explaining the advantages of nylon strings.
+- Explained the return conditions for online purchases, including the seven-calendar-day withdrawal period.
+- Maintained conversational context when answering follow-up questions about availability and return shipping.
+- Reported 15 units of the Tagima Memphis AC-39 and 10 units of the Rozini RC-104 in stock.
+- Clarified that the store would cover return shipping costs in cases of withdrawal from an online purchase.
+- When faced with the ambiguous reference "esse instrumento", provided stock information for both previously recommended models.
+
+### Notes
+
+- The agent presented promotions clearly and in an organized manner.
+- It demonstrated the ability to calculate discounts and interpret questions that depended on previous context.
+- It combined different types of information, including product availability, promotions, recommendations, and return policies.
+- Responses were clear, contextualized, and consistent with the questions asked.
+- The 10% discount shown for the Kalani ukulele is mathematically correct.
+- No apparent calculation errors or contradictions were identified within either conversation sequence.
+- The correspondence of prices, stock quantities, promotions, and return policies with the source CSV and PDF files has not yet been independently verified.
